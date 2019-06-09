@@ -1,0 +1,16 @@
+*{
+	padding: 0;
+	margin: 0;
+	font-family: Helvetica Neue;
+}
+
+body {
+    height: 100vh;
+	width: 100vw;
+	overflow: hidden;
+}
+img{
+height: 200;
+width: 200;
+}
+
