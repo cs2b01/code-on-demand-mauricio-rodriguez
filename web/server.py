@@ -13,6 +13,15 @@ app = Flask(__name__)
 def index():
     return render_template('index.html')
 
+@app.route('/users', methods = ['DELETE'])
+def delete_user():
+    id = request.form['key']
+    session = db.getSession(engine)
+    user = session.query(entities.User).filter(entities.User.id == id).one()
+    session.delete(user)
+    session.commit()
+    return "Deleted User"
+
 @app.route('/static/<content>')
 def static_content(content):
     return render_template(content)
@@ -74,12 +83,60 @@ def authenticate():
             ).filter(entities.User.username == username
             ).filter(entities.User.password == password
             ).one()
+        session['logged_user']= user.id
         message = {'message': 'Authorized'}
         return Response(message, status=200, mimetype='application/json')
     except Exception:
         message = {'message': 'Unauthorized'}
         return Response(message, status=401, mimetype='application/json')
 
+@app.route('/current', methods = ["GET"])
+def current_user():
+    db_session = db.getSession(engine)
+    user = db_session.query(entities.User).filter(
+        entities.User.id == session['logged_user']
+        ).first()
+    return Response(json.dumps(
+            user,
+            cls=connector.AlchemyEncoder),
+            mimetype='application/json'
+        )
+@app.route('/logout',methods=["GET"])
+def logout():
+    session.clear()
+    return render_template('index.html')
+
+@app.route('/messages/<user_from_id>/<user_to_id>', methods = ['GET'])
+def get_messages(user_from_id, user_to_id ):
+    db_session = db.getSession(engine)
+    messages = db_session.query(entities.Message).filter(
+        entities.Message.user_from_id == user_from_id).filter(
+        entities.Message.user_to_id == user_to_id
+    )
+    data = []
+    for message in messages:
+        data.append(message)
+    return Response(json.dumps(data, cls=connector.AlchemyEncoder), mimetype='application/json')
+
+@app.route('/create/messages', methods = ["POST"])
+def create_message():
+    data = json.loads(request.data)
+    user_to_id = data['user_to_id']
+    user_from_id = data['user_from_id']
+    content = data['content']
+
+    message = entities.Message(
+    user_to_id = user_to_id,
+    user_from_id = user_from_id,
+    content = content)
+
+    #2. Save in database
+    db_session = db.getSession(engine)
+    db_session.add(message)
+    db_session.commit()
+
+    response = {'message': 'created'}
+    return Response(json.dumps(response, cls=connector.AlchemyEncoder), status=200, mimetype='application/json')
 
 if __name__ == '__main__':
     app.secret_key = ".."
